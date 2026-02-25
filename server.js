@@ -442,6 +442,86 @@ app.post("/pergunta", async (req, res) => {
   }
 });
 
+// Vincular WhatsApp (wa_id) a um usuario_id
+app.post("/vincular-whatsapp", async (req, res) => {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ success: false, message: "Não autorizado" });
+  }
+
+  const { wa_id, usuario_id } = req.body || {};
+  if (!wa_id || !usuario_id) {
+    return res.status(400).json({
+      success: false,
+      message: "Campos obrigatórios: wa_id, usuario_id",
+    });
+  }
+
+  try {
+    // upsert usando querystring do PostgREST
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/contatos_whatsapp`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify({ wa_id, usuario_id }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, data });
+    }
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Descobrir usuario_id pelo wa_id
+app.get("/usuario-por-whatsapp", async (req, res) => {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ success: false, message: "Não autorizado" });
+  }
+
+  const { wa_id } = req.query;
+  if (!wa_id) {
+    return res.status(400).json({ success: false, message: "Campo obrigatório: wa_id" });
+  }
+
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/contatos_whatsapp?wa_id=eq.${encodeURIComponent(wa_id)}&select=wa_id,usuario_id`,
+      {
+        method: "GET",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, data });
+    }
+
+    const row = Array.isArray(data) ? data[0] : null;
+    if (!row) {
+      return res.json({ success: true, found: false, message: "WhatsApp ainda não vinculado" });
+    }
+
+    return res.json({ success: true, found: true, data: row });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
