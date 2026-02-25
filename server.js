@@ -91,6 +91,48 @@ app.post("/criar-obra", async (req, res) => {
   }
 });
 
+// Listar obras por usuario
+app.get("/obras", async (req, res) => {
+  const apiKey = req.headers["x-api-key"];
+
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ success: false, message: "Não autorizado" });
+  }
+
+  const { usuario_id } = req.query;
+
+  if (!usuario_id) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Campo obrigatório: usuario_id" });
+  }
+
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/obras?usuario_id=eq.${usuario_id}&select=*`,
+      {
+        method: "GET",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    // Se Supabase retornar erro, costuma vir com "message"
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, data });
+    }
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
